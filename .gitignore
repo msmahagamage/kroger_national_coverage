@@ -4,5 +4,4 @@ __pycache__/
 *.pyc
 .DS_Store
 .env
-data/raw/kroger_official_api_response.json
-
+data/raw/kroger_family_official_api_response.json

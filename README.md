@@ -1,6 +1,6 @@
 # Kroger National Coverage
 
-A portable, GitHub-ready analysis of official U.S. Kroger-banner locations.
+A portable, GitHub-ready analysis of official U.S. Kroger-family supermarket locations.
 Every project file reference is relative to the repository root; the project can
 be moved, copied to another computer, or published on GitHub without editing
 local paths.
@@ -9,14 +9,14 @@ local paths.
 
 ### [Open the Live Kroger Locations Map](https://msmahagamage.github.io/kroger_national_coverage/)
 
-The interactive map displays 1,264 official Kroger API locations across 16
-states. Click a marker or cluster to explore store locations, addresses, ZIP
-codes, and status information.
+The interactive map displays official Kroger-family supermarkets collected
+from Kroger's Locations API. Use the layer control to show or hide individual
+banners and click a marker or cluster for store details.
 
 ## Included
 
 - `data/raw/kroger_official_api_response.json` — local official API audit response (ignored by Git)
-- `data/processed/kroger_official_locations.csv` — official API location export
+- `data/processed/kroger_family_official_locations.csv` — official family supermarket export
 - `data/processed/state_summary.csv` — counts by state
 - `data/processed/zip_summary.csv` — counts by state and ZIP code
 - `data/processed/brand_summary.csv` — counts by store banner
@@ -29,10 +29,12 @@ codes, and status information.
 
 ## Scope
 
-The current dataset was collected from Kroger's official Locations API using
-the `KROGER` chain filter. It contains Kroger and Kroger Marketplace locations,
-not other Kroger-owned banners such as Ralphs, Smith's, King Soopers, QFC,
-Mariano's, or Pick 'n Save.
+The dataset is collected from Kroger's official Locations and Chains APIs. It
+includes Kroger plus active Kroger-owned supermarket banners such as Ralphs,
+Smith's, King Soopers, QFC, Mariano's, Pick 'n Save, Fry's, Fred Meyer,
+Harris Teeter, Dillons, City Market, and others. Fuel, convenience, clinic,
+jewelry, logistics, laboratory, office, warehouse, and distribution records
+are excluded.
 
 ## Quick start
 
@@ -72,7 +74,7 @@ for map tiles and the Leaflet assets loaded over HTTPS.
 
 ```powershell
 Copy-Item .env.example .env
-python scripts/download_official_api.py --chain KROGER
+python scripts/download_official_api.py
 python scripts/build_all.py
 ```
 

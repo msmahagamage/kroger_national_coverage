@@ -33,20 +33,20 @@ def build_map(df: pd.DataFrame, state: pd.DataFrame) -> None:
     m = folium.Map(location=[39.5, -98.35], zoom_start=4, tiles="CartoDB positron", control_scale=True, prefer_canvas=True)
     Fullscreen(position="topright").add_to(m)
     folium.TileLayer("OpenStreetMap", name="OpenStreetMap").add_to(m)
-    kroger_only_input = bool(len(df)) and df["is_kroger_banner"].astype(bool).all()
-    primary_label = "Official Kroger-banner locations"
-    family = folium.FeatureGroup(name=f"{primary_label} ({len(df):,})", show=True)
-    cluster = MarkerCluster(name="Locations", options={"disableClusteringAtZoom": 11}).add_to(family)
-    for row in df.itertuples(index=False):
-        website = str(row.website) if pd.notna(row.website) else ""
-        safe_url = website if website.startswith("https://") else ""
-        link = f'<br><a href="{safe_url}" target="_blank" rel="noopener">Store page</a>' if safe_url else ""
-        popup = folium.Popup(f"<b>{row.name}</b><br>{row.brand}<br>{row.address}<br>{row.city}, {row.state} {row.zip_code}<br><b>Status:</b> {row.status}<br><small>{row.status_basis}</small>{link}", max_width=340)
-        marker_color = "#238636" if row.status == "active" else ("#cf222e" if row.status == "inactive" else "#6e7781")
-        folium.CircleMarker([row.latitude, row.longitude], radius=4, color="#0b4fa2", weight=1, fill=True, fill_color=marker_color, fill_opacity=.8, tooltip=f"{row.brand} — {row.city}, {row.state} — {row.status}", popup=popup).add_to(cluster)
-    family.add_to(m)
+    palette = ["#005da6", "#e31837", "#238636", "#8250df", "#bf8700", "#0969da", "#cf222e", "#1a7f37"]
+    for brand_index, (brand, brand_frame) in enumerate(df.groupby("brand", sort=True)):
+        layer = folium.FeatureGroup(name=f"{brand} ({len(brand_frame):,})", show=True)
+        cluster = MarkerCluster(options={"disableClusteringAtZoom": 11}).add_to(layer)
+        brand_color = palette[brand_index % len(palette)]
+        for row in brand_frame.itertuples(index=False):
+            website = str(row.website) if pd.notna(row.website) else ""
+            safe_url = website if website.startswith("https://") else ""
+            link = f'<br><a href="{safe_url}" target="_blank" rel="noopener">Store page</a>' if safe_url else ""
+            popup = folium.Popup(f"<b>{row.name}</b><br><b>Banner:</b> {row.brand}<br>{row.address}<br>{row.city}, {row.state} {row.zip_code}<br><b>Status:</b> {row.status}<br><small>{row.status_basis}</small>{link}", max_width=340)
+            folium.CircleMarker([row.latitude, row.longitude], radius=4, color="#333", weight=1, fill=True, fill_color=brand_color, fill_opacity=.8, tooltip=f"{row.brand} — {row.city}, {row.state} — {row.status}", popup=popup).add_to(cluster)
+        layer.add_to(m)
     folium.LayerControl(collapsed=False).add_to(m)
-    record_label = "official Kroger-banner locations"
+    record_label = "official Kroger-family supermarket locations"
     data_source = "Kroger official Locations API"
     title = f'''<div style="position:fixed;top:10px;left:50px;z-index:9999;background:white;padding:10px 14px;border:1px solid #bbb;border-radius:6px;font:14px Arial;box-shadow:0 1px 5px #999"><b>Kroger National Coverage</b><br>{len(df):,} {record_label} · {df['state'].nunique()} states<br><small>Data source: {data_source} · built {date.today().isoformat()}</small></div>'''
     m.get_root().html.add_child(folium.Element(title))
@@ -55,7 +55,7 @@ def build_map(df: pd.DataFrame, state: pd.DataFrame) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--locations", type=Path, default=Path("data/processed/kroger_official_locations.csv"), help="Kroger official API location CSV")
+    parser.add_argument("--locations", type=Path, default=Path("data/processed/kroger_family_official_locations.csv"), help="Official Kroger-family API location CSV")
     args = parser.parse_args()
     print("[1/4] Loading location data...")
     location_path = args.locations if args.locations.is_absolute() else ROOT / args.locations
