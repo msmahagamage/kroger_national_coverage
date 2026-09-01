@@ -97,7 +97,9 @@ def build_map(df: pd.DataFrame, state: pd.DataFrame) -> None:
     if 0 < len(kroger) < len(df):
         FastMarkerCluster(kroger[["latitude", "longitude"]].values.tolist(), name=f"Kroger banner only ({len(kroger):,})", show=False).add_to(m)
     folium.LayerControl(collapsed=False).add_to(m)
-    title = f'''<div style="position:fixed;top:10px;left:50px;z-index:9999;background:white;padding:10px 14px;border:1px solid #bbb;border-radius:6px;font:14px Arial;box-shadow:0 1px 5px #999"><b>Kroger National Coverage</b><br>{len(df):,} Kroger-family supermarket records · {df['state'].nunique()} states<br><small>Source: OpenStreetMap contributors · built {date.today().isoformat()}</small></div>'''
+    record_label = "official Kroger-banner locations" if kroger_only_input else "Kroger-family supermarket records"
+    data_source = "Kroger official Locations API" if df["source"].eq("Kroger official Locations API").all() else "documented project source"
+    title = f'''<div style="position:fixed;top:10px;left:50px;z-index:9999;background:white;padding:10px 14px;border:1px solid #bbb;border-radius:6px;font:14px Arial;box-shadow:0 1px 5px #999"><b>Kroger National Coverage</b><br>{len(df):,} {record_label} · {df['state'].nunique()} states<br><small>Data source: {data_source} · built {date.today().isoformat()}</small></div>'''
     m.get_root().html.add_child(folium.Element(title))
     m.save(DOCS / "index.html")
 
@@ -107,14 +109,17 @@ def main() -> None:
     parser.add_argument("--raw", type=Path, default=RAW)
     parser.add_argument("--locations", type=Path, help="Use an already-cleaned location CSV, such as the official API export")
     args = parser.parse_args()
+    print("[1/4] Loading location data...")
     if args.locations:
         location_path = args.locations if args.locations.is_absolute() else ROOT / args.locations
         df = pd.read_csv(location_path, dtype={"zip_code": "string"}).fillna({"website": "", "phone": "", "address": "", "city": ""})
     else:
         df = load_locations(args.raw)
+    print(f"[2/4] Loaded {len(df):,} locations. Writing summary files...")
     state, zipcode, brand = write_summaries(df)
+    print("[3/4] Building interactive web map...")
     build_map(df, state)
-    print(f"Built {len(df):,} locations, {len(state)} states, {len(zipcode):,} state/ZIP groups, and docs/index.html")
+    print(f"[4/4] Complete: built {len(df):,} locations, {len(state)} states, {len(zipcode):,} state/ZIP groups, and docs/index.html")
 
 
 if __name__ == "__main__":
