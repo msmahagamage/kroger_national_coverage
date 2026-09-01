@@ -96,7 +96,9 @@ def main() -> None:
     parser.add_argument("--delay", type=float, default=0.12, help="Delay between API calls")
     args = parser.parse_args()
     load_dotenv()
-    seed_path = ROOT / "data" / "processed" / "kroger_family_locations.csv"
+    seed_path = ROOT / "data" / "processed" / "kroger_official_locations.csv"
+    if not seed_path.exists():
+        raise SystemExit("Bootstrap file data/processed/kroger_official_locations.csv is missing.")
     seeds = pd.read_csv(seed_path)
     if args.chain.casefold() == "kroger":
         seeds = seeds[seeds["is_kroger_banner"].astype(str).str.casefold().eq("true")]

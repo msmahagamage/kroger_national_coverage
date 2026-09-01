@@ -2,67 +2,22 @@
 from __future__ import annotations
 
 import argparse
-import json
-import re
 from datetime import date
 from pathlib import Path
 
 import folium
 import pandas as pd
-from folium.plugins import FastMarkerCluster, Fullscreen, MarkerCluster
+from folium.plugins import Fullscreen, MarkerCluster
 
 ROOT = Path(__file__).resolve().parents[1]
-RAW = ROOT / "data" / "raw" / "kroger_us.geojson"
 PROCESSED = ROOT / "data" / "processed"
 DOCS = ROOT / "docs"
 
 
-def clean_zip(value: object) -> str:
-    match = re.search(r"\b(\d{5})\b", str(value or ""))
-    return match.group(1) if match else ""
-
-
-def load_locations(raw_path: Path = RAW) -> pd.DataFrame:
-    payload = json.loads(raw_path.read_text(encoding="utf-8"))
-    rows = []
-    for feature in payload.get("features", []):
-        props = feature.get("properties") or {}
-        geometry = feature.get("geometry") or {}
-        coords = geometry.get("coordinates") or [None, None]
-        if geometry.get("type") != "Point" or len(coords) < 2:
-            continue
-        url = str(props.get("website") or "")
-        banner = str(props.get("brand") or props.get("name") or "Unknown").strip()
-        rows.append({
-            "location_id": str(props.get("ref") or ""),
-            "name": str(props.get("name") or banner).strip(),
-            "brand": banner,
-            "address": " ".join(filter(None, [str(props.get("addr:housenumber") or "").strip(), str(props.get("addr:street") or "").strip()])),
-            "city": str(props.get("addr:city") or "").strip(),
-            "state": str(props.get("addr:state") or "").strip().upper(),
-            "zip_code": clean_zip(props.get("addr:postcode")),
-            "phone": str(props.get("phone") or "").strip(),
-            "latitude": float(coords[1]),
-            "longitude": float(coords[0]),
-            "website": url,
-            "is_kroger_banner": banner.casefold() == "kroger" or str(props.get("name") or "").casefold().startswith("kroger"),
-            # This source exports current OSM objects tagged shop=supermarket.
-            # Lifecycle-prefixed objects (closed:/disused:/abandoned:) are not
-            # present, so "active" is an OSM classification, not a real-time
-            # confirmation from Kroger.
-            "status": "active" if props.get("shop") == "supermarket" else "unknown",
-            "status_basis": "Mapped as shop=supermarket in source; not real-time verified" if props.get("shop") == "supermarket" else "No current shop tag in source",
-            "source": "OpenStreetMap via whubsch/atp-import",
-        })
-    df = pd.DataFrame(rows)
-    df = df[df["state"].str.fullmatch(r"[A-Z]{2}", na=False)].copy()
-    df = df.drop_duplicates(subset=["location_id", "latitude", "longitude"]).sort_values(["state", "city", "brand", "name"])
-    return df.reset_index(drop=True)
-
-
 def write_summaries(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     PROCESSED.mkdir(parents=True, exist_ok=True)
-    df.to_csv(PROCESSED / "kroger_family_locations.csv", index=False)
+    if not df["source"].eq("Kroger official Locations API").all():
+        raise ValueError("Only Kroger official Locations API records are supported.")
     df = df.assign(_active=df["status"].eq("active"), _inactive=df["status"].eq("inactive"), _unknown=df["status"].eq("unknown"))
     state = (df.groupby("state", as_index=False).agg(locations=("location_id", "size"), active_locations=("_active", "sum"), inactive_locations=("_inactive", "sum"), unknown_status_locations=("_unknown", "sum"), kroger_banner_locations=("is_kroger_banner", "sum"), brands=("brand", "nunique")).sort_values("locations", ascending=False))
     zipcode = (df[df["zip_code"].ne("")].groupby(["state", "zip_code"], as_index=False).agg(locations=("location_id", "size"), active_locations=("_active", "sum"), inactive_locations=("_inactive", "sum"), unknown_status_locations=("_unknown", "sum"), kroger_banner_locations=("is_kroger_banner", "sum"), brands=("brand", "nunique")).sort_values(["locations", "state", "zip_code"], ascending=[False, True, True]))
@@ -79,7 +34,7 @@ def build_map(df: pd.DataFrame, state: pd.DataFrame) -> None:
     Fullscreen(position="topright").add_to(m)
     folium.TileLayer("OpenStreetMap", name="OpenStreetMap").add_to(m)
     kroger_only_input = bool(len(df)) and df["is_kroger_banner"].astype(bool).all()
-    primary_label = "Official Kroger-banner locations" if kroger_only_input else "All Kroger-family locations"
+    primary_label = "Official Kroger-banner locations"
     family = folium.FeatureGroup(name=f"{primary_label} ({len(df):,})", show=True)
     cluster = MarkerCluster(name="Locations", options={"disableClusteringAtZoom": 11}).add_to(family)
     for row in df.itertuples(index=False):
@@ -90,15 +45,9 @@ def build_map(df: pd.DataFrame, state: pd.DataFrame) -> None:
         marker_color = "#238636" if row.status == "active" else ("#cf222e" if row.status == "inactive" else "#6e7781")
         folium.CircleMarker([row.latitude, row.longitude], radius=4, color="#0b4fa2", weight=1, fill=True, fill_color=marker_color, fill_opacity=.8, tooltip=f"{row.brand} — {row.city}, {row.state} — {row.status}", popup=popup).add_to(cluster)
     family.add_to(m)
-    kroger = df[df["is_kroger_banner"]]
-    # Add a separate Kroger-only layer only when the input also contains other
-    # Kroger-family banners. For a KROGER-only official API export it would be
-    # an exact duplicate of the main layer.
-    if 0 < len(kroger) < len(df):
-        FastMarkerCluster(kroger[["latitude", "longitude"]].values.tolist(), name=f"Kroger banner only ({len(kroger):,})", show=False).add_to(m)
     folium.LayerControl(collapsed=False).add_to(m)
-    record_label = "official Kroger-banner locations" if kroger_only_input else "Kroger-family supermarket records"
-    data_source = "Kroger official Locations API" if df["source"].eq("Kroger official Locations API").all() else "documented project source"
+    record_label = "official Kroger-banner locations"
+    data_source = "Kroger official Locations API"
     title = f'''<div style="position:fixed;top:10px;left:50px;z-index:9999;background:white;padding:10px 14px;border:1px solid #bbb;border-radius:6px;font:14px Arial;box-shadow:0 1px 5px #999"><b>Kroger National Coverage</b><br>{len(df):,} {record_label} · {df['state'].nunique()} states<br><small>Data source: {data_source} · built {date.today().isoformat()}</small></div>'''
     m.get_root().html.add_child(folium.Element(title))
     m.save(DOCS / "index.html")
@@ -106,15 +55,11 @@ def build_map(df: pd.DataFrame, state: pd.DataFrame) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--raw", type=Path, default=RAW)
-    parser.add_argument("--locations", type=Path, help="Use an already-cleaned location CSV, such as the official API export")
+    parser.add_argument("--locations", type=Path, default=Path("data/processed/kroger_official_locations.csv"), help="Kroger official API location CSV")
     args = parser.parse_args()
     print("[1/4] Loading location data...")
-    if args.locations:
-        location_path = args.locations if args.locations.is_absolute() else ROOT / args.locations
-        df = pd.read_csv(location_path, dtype={"zip_code": "string"}).fillna({"website": "", "phone": "", "address": "", "city": ""})
-    else:
-        df = load_locations(args.raw)
+    location_path = args.locations if args.locations.is_absolute() else ROOT / args.locations
+    df = pd.read_csv(location_path, dtype={"zip_code": "string"}).fillna({"website": "", "phone": "", "address": "", "city": ""})
     print(f"[2/4] Loaded {len(df):,} locations. Writing summary files...")
     state, zipcode, brand = write_summaries(df)
     print("[3/4] Building interactive web map...")

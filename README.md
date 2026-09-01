@@ -17,7 +17,6 @@ codes, and status information.
 
 - `data/raw/kroger_official_api_response.json` — local official API audit response (ignored by Git)
 - `data/processed/kroger_official_locations.csv` — official API location export
-- `data/processed/kroger_family_locations.csv` — cleaned location-level data
 - `data/processed/state_summary.csv` — counts by state
 - `data/processed/zip_summary.csv` — counts by state and ZIP code
 - `data/processed/brand_summary.csv` — counts by store banner
@@ -74,7 +73,7 @@ for map tiles and the Leaflet assets loaded over HTTPS.
 ```powershell
 Copy-Item .env.example .env
 python scripts/download_official_api.py --chain KROGER
-python scripts/build_all.py --locations data/processed/kroger_official_locations.csv
+python scripts/build_all.py
 ```
 
 The official endpoint is proximity-based and limited to 1,600 calls per day.
