@@ -78,7 +78,7 @@ records. The ignored raw response file preserves an audit trail locally.
 
 ## Attribution and licensing
 
-Project code is MIT-licensed. Location records are returned by Kroger's official
+Location records are returned by Kroger's official
 Locations API and remain subject to Kroger's API terms.
 
 ## Store status
