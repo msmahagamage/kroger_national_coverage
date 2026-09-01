@@ -5,6 +5,14 @@ Every project file reference is relative to the repository root; the project can
 be moved, copied to another computer, or published on GitHub without editing
 local paths.
 
+## Interactive Web Map
+
+### [Open the Live Kroger Locations Map](https://msmahagamage.github.io/kroger_national_coverage/)
+
+The interactive map displays 1,264 official Kroger API locations across 16
+states. Click a marker or cluster to explore store locations, addresses, ZIP
+codes, and status information.
+
 ## Included
 
 - `data/raw/kroger_official_api_response.json` — local official API audit response (ignored by Git)
